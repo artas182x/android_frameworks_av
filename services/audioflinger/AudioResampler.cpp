@@ -28,6 +28,11 @@
 #include "AudioResamplerCubic.h"
 #include "AudioResamplerDyn.h"
 
+#if defined(OMAP_ENHANCEMENT) || defined(OMAP_TUNA)
+#include "AudioResamplerSpeex.h"
+#include <utils/threads.h>
+#endif
+
 #ifdef __arm__
 #include <machine/cpu-features.h>
 #endif
@@ -253,12 +258,44 @@ AudioResampler* AudioResampler::create(audio_format_t format, int inChannelCount
             }
         }
         break;
+#if defined(OMAP_ENHANCEMENT) || defined(OMAP_TUNA)
+    case SPEEX_QUALITY:
+        ALOGV("Create Speex Resampler");
+        resampler = new AudioResamplerSpeex(bitDepth, inChannelCount, sampleRate);
+        break;
+#endif
     }
 
     // initialize resampler
     resampler->init();
     return resampler;
 }
+
+#if defined(OMAP_ENHANCEMENT) || defined (OMAP_TUNA)
+int32_t AudioResampler::checkRate(int32_t outRate, int32_t inRate) {
+    static AudioResampler *resampler = NULL;
+
+    if (!resampler) {
+        static android::Mutex lock;
+        android::AutoMutex _l(lock);
+        if (!resampler) {
+            resampler = create(16, 2, 44100);
+            ALOGD("static resampler for checkRate() allocated\n");
+        }
+    }
+
+    return resampler->checkCRate(outRate, inRate);
+}
+
+int32_t AudioResampler::checkCRate(int32_t outRate, int32_t inRate) const {
+    if (inRate > 2*outRate) {
+        ALOGD("Unsupported conversion from %d to %d. Maximum input rate is %d.\n",
+             inRate, outRate, 2*outRate);
+        return 2*outRate;
+    }
+    return 0;
+}
+#endif
 
 AudioResampler::AudioResampler(int inChannelCount,
         int32_t sampleRate, src_quality quality) :

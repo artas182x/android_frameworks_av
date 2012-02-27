@@ -59,6 +59,20 @@ LOCAL_STATIC_LIBRARIES := \
     libmedia_helper \
     libserviceutility
 
+ifeq ($(OMAP_ENHANCEMENT), true)
+    OMAP_SPEEX_RESAMPLER := true
+else
+ifeq ($(OMAP_TUNA), true)
+    OMAP_SPEEX_RESAMPLER := true
+endif
+endif
+
+ifeq ($(OMAP_SPEEX_RESAMPLER), true)
+    LOCAL_SRC_FILES += AudioResamplerSpeex.cpp.arm
+    LOCAL_C_INCLUDES += external/speex/include
+    LOCAL_SHARED_LIBRARIES += libspeexresampler
+endif
+
 LOCAL_MODULE:= libaudioflinger
 LOCAL_32_BIT_ONLY := true
 
