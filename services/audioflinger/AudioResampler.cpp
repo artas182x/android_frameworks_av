@@ -98,6 +98,9 @@ bool AudioResampler::qualityIsSupported(src_quality quality)
     case DYN_LOW_QUALITY:
     case DYN_MED_QUALITY:
     case DYN_HIGH_QUALITY:
+#if defined(OMAP_ENHANCEMENT) || defined(OMAP_TUNA)
+    case SPEEX_QUALITY:
+#endif
         return true;
     default:
         return false;
@@ -118,7 +121,11 @@ void AudioResampler::init_routine()
         if (*endptr == '\0') {
             defaultQuality = (src_quality) l;
             ALOGD("forcing AudioResampler quality to %d", defaultQuality);
+#if defined(OMAP_ENHANCEMENT) || defined(OMAP_TUNA
+            if (defaultQuality < DEFAULT_QUALITY || defaultQuality > SPEEX_QUALITY) {
+#else
             if (defaultQuality < DEFAULT_QUALITY || defaultQuality > DYN_HIGH_QUALITY) {
+#endif
                 defaultQuality = DEFAULT_QUALITY;
             }
         }
@@ -144,6 +151,10 @@ uint32_t AudioResampler::qualityMHz(src_quality quality)
         return 6;
     case DYN_HIGH_QUALITY:
         return 12;
+#if defined(OMAP_ENHANCEMENT) || defined(OMAP_TUNA)
+    case SPEEX_QUALITY:
+        return 10;
+#endif
     }
 }
 
@@ -212,6 +223,11 @@ AudioResampler* AudioResampler::create(audio_format_t format, int inChannelCount
         case DYN_HIGH_QUALITY:
             quality = DYN_MED_QUALITY;
             break;
+#if defined(OMAP_ENHANCEMENT) || defined(OMAP_TUNA)
+        case SPEEX_QUALITY:
+            quality = DEFAULT_QUALITY;
+            break;
+#endif
         }
     }
     pthread_mutex_unlock(&mutex);
