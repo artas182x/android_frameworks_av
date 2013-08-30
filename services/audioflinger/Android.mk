@@ -30,7 +30,9 @@ LOCAL_SRC_FILES += StateQueue.cpp
 # uncomment for debugging timing problems related to StateQueue::push()
 LOCAL_CFLAGS += -DSTATE_QUEUE_DUMP
 
+ifneq ($(DEBUG_FORCE_STRICT_ALIASING),yes)
 LOCAL_CFLAGS += -fno-strict-aliasing
+endif
 
 LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-effects) \
