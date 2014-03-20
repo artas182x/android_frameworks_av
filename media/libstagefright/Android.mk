@@ -176,6 +176,12 @@ LOCAL_C_INCLUDES += \
 endif
 
 LOCAL_MODULE:= libstagefright
+ifeq ($(combo_target),TARGET_) # Workaround GCC 4.9 not being able to compile this ("internal compiler error: Segmentation fault")
+    ifeq ($(TARGET_ARCH),arm)
+        LOCAL_CC := $(TOP)/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.8-linaro/bin/arm-linux-androideabi-gcc
+        LOCAL_CXX := $(TOP)/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.8-linaro/bin/arm-linux-androideabi-g++
+    endif
+endif
 
 LOCAL_MODULE_TAGS := optional
 
