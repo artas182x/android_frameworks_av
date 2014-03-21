@@ -175,6 +175,8 @@ LOCAL_C_INCLUDES += \
 
 endif
 
+LOCAL_CFLAGS += -O2 -finline-functions
+
 LOCAL_MODULE:= libstagefright
 
 LOCAL_MODULE_TAGS := optional
