@@ -40,6 +40,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/timedtext/TimedTextDriver.h>
 #include <media/stagefright/AudioPlayer.h>
+#include <media/stagefright/ClockEstimator.h>
 #include <media/stagefright/DataSource.h>
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaBuffer.h>
@@ -227,6 +228,8 @@ AwesomePlayer::AwesomePlayer()
     mAudioTearDownEvent = new AwesomeEvent(this,
                               &AwesomePlayer::onAudioTearDownEvent);
     mAudioTearDownEventPending = false;
+
+    mClockEstimator = new WindowedLinearFitEstimator();
 
     reset();
 }
@@ -1859,21 +1862,28 @@ void AwesomePlayer::onVideoEvent() {
     TimeSource *ts =
         ((mFlags & AUDIO_AT_EOS) || !(mFlags & AUDIOPLAYER_STARTED))
             ? &mSystemTimeSource : mTimeSource;
+    int64_t systemTimeUs = mSystemTimeSource.getRealTimeUs();
+    int64_t looperTimeUs = ALooper::GetNowUs();
 
     if (mFlags & FIRST_FRAME) {
         modifyFlags(FIRST_FRAME, CLEAR);
         mSinceLastDropped = 0;
-        mTimeSourceDeltaUs = ts->getRealTimeUs() - timeUs;
+        mClockEstimator->reset();
+        mTimeSourceDeltaUs = estimateRealTimeUs(ts, systemTimeUs) - timeUs;
     }
 
     int64_t realTimeUs, mediaTimeUs;
     if (!(mFlags & AUDIO_AT_EOS) && mAudioPlayer != NULL
         && mAudioPlayer->getMediaTimeMapping(&realTimeUs, &mediaTimeUs)) {
+        ALOGV("updating TSdelta (%" PRId64 " => %" PRId64 " change %" PRId64 ")",
+              mTimeSourceDeltaUs, realTimeUs - mediaTimeUs,
+              mTimeSourceDeltaUs - (realTimeUs - mediaTimeUs));
+        ATRACE_INT("TS delta change (ms)", (mTimeSourceDeltaUs - (realTimeUs - mediaTimeUs)) / 1E3);
         mTimeSourceDeltaUs = realTimeUs - mediaTimeUs;
     }
 
     if (wasSeeking == SEEK_VIDEO_ONLY) {
-        int64_t nowUs = ts->getRealTimeUs() - mTimeSourceDeltaUs;
+        int64_t nowUs = estimateRealTimeUs(ts, systemTimeUs) - mTimeSourceDeltaUs;
 
         int64_t latenessUs = nowUs - timeUs;
 
@@ -1884,12 +1894,13 @@ void AwesomePlayer::onVideoEvent() {
         }
     }
 
+    int64_t latenessUs = 0;
     if (wasSeeking == NO_SEEK) {
         // Let's display the first frame after seeking right away.
 
-        int64_t nowUs = ts->getRealTimeUs() - mTimeSourceDeltaUs;
+        int64_t nowUs = estimateRealTimeUs(ts, systemTimeUs) - mTimeSourceDeltaUs;
 
-        int64_t latenessUs = nowUs - timeUs;
+        latenessUs = nowUs - timeUs;
 
         ATRACE_INT("Video Lateness (ms)", latenessUs / 1E3);
 
@@ -1943,9 +1954,9 @@ void AwesomePlayer::onVideoEvent() {
             }
         }
 
-        if (latenessUs < -10000) {
-            // We're more than 10ms early.
-            postVideoEvent_l(10000);
+        if (latenessUs < -30000) {
+            // We're more than 30ms early, schedule at most 20 ms before time due
+            postVideoEvent_l(latenessUs < -60000 ? 30000 : -latenessUs - 20000);
             return;
         }
     }
@@ -1959,6 +1970,8 @@ void AwesomePlayer::onVideoEvent() {
 
     if (mVideoRenderer != NULL) {
         mSinceLastDropped++;
+        mVideoBuffer->meta_data()->setInt64(kKeyTime, looperTimeUs - latenessUs);
+
         mVideoRenderer->render(mVideoBuffer);
         if (!mVideoRenderingStarted) {
             mVideoRenderingStarted = true;
@@ -2008,12 +2021,24 @@ void AwesomePlayer::onVideoEvent() {
 
         int64_t nextTimeUs;
         CHECK(mVideoBuffer->meta_data()->findInt64(kKeyTime, &nextTimeUs));
-        int64_t delayUs = nextTimeUs - ts->getRealTimeUs() + mTimeSourceDeltaUs;
-        postVideoEvent_l(delayUs > 10000 ? 10000 : delayUs < 0 ? 0 : delayUs);
+        systemTimeUs = mSystemTimeSource.getRealTimeUs();
+        int64_t delayUs = nextTimeUs - estimateRealTimeUs(ts, systemTimeUs) + mTimeSourceDeltaUs;
+        ATRACE_INT("Frame delta (ms)", (nextTimeUs - timeUs) / 1E3);
+        ALOGV("next frame in %" PRId64, delayUs);
+        // try to schedule 30ms before time due
+        postVideoEvent_l(delayUs > 60000 ? 30000 : (delayUs < 30000 ? 0 : delayUs - 30000));
         return;
     }
 
     postVideoEvent_l();
+}
+
+int64_t AwesomePlayer::estimateRealTimeUs(TimeSource *ts, int64_t systemTimeUs) {
+    if (ts == &mSystemTimeSource) {
+        return systemTimeUs;
+    } else {
+        return (int64_t)mClockEstimator->estimate(systemTimeUs, ts->getRealTimeUs());
+    }
 }
 
 void AwesomePlayer::postVideoEvent_l(int64_t delayUs) {
