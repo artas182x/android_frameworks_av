@@ -73,19 +73,6 @@ else
 LOCAL_C_INCLUDES += $(TOP)/frameworks/native/include/media/openmax
 endif
 
-ifneq ($(TARGET_QCOM_MEDIA_VARIANT),)
-LOCAL_C_INCLUDES += \
-        $(TOP)/hardware/qcom/media-$(TARGET_QCOM_MEDIA_VARIANT)/mm-core/inc
-else
-LOCAL_C_INCLUDES += $(TOP)/frameworks/native/include/media/openmax
-endif
-
-ifeq ($(BOARD_USES_STE_FMRADIO),true)
-LOCAL_SRC_FILES += \
-        FMRadioSource.cpp                 \
-        PCMExtractor.cpp
-endif
-
 LOCAL_SHARED_LIBRARIES := \
         libbinder \
         libcamera_client \
