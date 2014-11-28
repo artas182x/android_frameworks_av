@@ -30,9 +30,9 @@
 
 namespace android {
 
-AudioResamplerSpeex::AudioResamplerSpeex(int bitDepth, int inChannelCount, int32_t sampleRate,
+AudioResamplerSpeex::AudioResamplerSpeex(int inChannelCount, int32_t sampleRate,
                                          int speexQuality) :
-        AudioResampler(bitDepth, inChannelCount, sampleRate, AudioResampler::SPEEX_QUALITY),
+        AudioResampler(inChannelCount, sampleRate, AudioResampler::SPEEX_QUALITY),
         mSpeexResamplerState(NULL), mSpeexQuality(speexQuality),
         mRateNum(0), mRateDen(0) {
 }

@@ -121,7 +121,7 @@ void AudioResampler::init_routine()
         if (*endptr == '\0') {
             defaultQuality = (src_quality) l;
             ALOGD("forcing AudioResampler quality to %d", defaultQuality);
-#if defined(OMAP_ENHANCEMENT) || defined(OMAP_TUNA
+#if defined(OMAP_ENHANCEMENT) || defined(OMAP_TUNA)
             if (defaultQuality < DEFAULT_QUALITY || defaultQuality > SPEEX_QUALITY) {
 #else
             if (defaultQuality < DEFAULT_QUALITY || defaultQuality > DYN_HIGH_QUALITY) {
@@ -277,7 +277,8 @@ AudioResampler* AudioResampler::create(audio_format_t format, int inChannelCount
 #if defined(OMAP_ENHANCEMENT) || defined(OMAP_TUNA)
     case SPEEX_QUALITY:
         ALOGV("Create Speex Resampler");
-        resampler = new AudioResamplerSpeex(bitDepth, inChannelCount, sampleRate);
+        LOG_ALWAYS_FATAL_IF(format != AUDIO_FORMAT_PCM_16_BIT);
+        resampler = new AudioResamplerSpeex(inChannelCount, sampleRate);
         break;
 #endif
     }
@@ -295,7 +296,7 @@ int32_t AudioResampler::checkRate(int32_t outRate, int32_t inRate) {
         static android::Mutex lock;
         android::AutoMutex _l(lock);
         if (!resampler) {
-            resampler = create(16, 2, 44100);
+            resampler = create(AUDIO_FORMAT_PCM_16_BIT, 2, 44100);
             ALOGD("static resampler for checkRate() allocated\n");
         }
     }
